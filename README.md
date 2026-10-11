@@ -75,6 +75,13 @@ or `make clean` to also delete the database volume.
 3. Watch the progress steps (fetching → AI review → Madurai roast), then read the review and
    the roast, and share it to the Roast Wall.
 
+### Deploying to a server
+
+To put it on a VPS behind an existing Traefik proxy (HTTPS, one public address), see
+[`deploy/DEPLOY.md`](deploy/DEPLOY.md). It uses `docker-compose.prod.yml` and
+`.env.prod.example`, and ships helper scripts for finding your Traefik settings and
+generating secrets.
+
 ---
 
 ## Configuration

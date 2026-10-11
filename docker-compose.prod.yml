@@ -1,0 +1,58 @@
+# Kalaai Code - production override that joins an EXISTING Traefik reverse proxy.
+#
+# Use it together with the base file (see deploy/DEPLOY.md):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# What it changes versus the base file:
+#   - nothing is published on the host (no :3000 / :8000 / :5432); Traefik is the only way in
+#   - api + web also join Traefik's Docker network and get routing labels
+#   - one public host serves everything:  /api/*  -> api (8000),  everything else -> web (8080)
+#
+# Required variables (set in .env, template: .env.prod.example):
+#   KALAAI_HOST, TRAEFIK_NETWORK, TRAEFIK_CERTRESOLVER   (TRAEFIK_ENTRYPOINT defaults to websecure)
+# Find the Traefik values on the server with:  bash deploy/discover-traefik.sh
+#
+# Needs Docker Compose >= 2.24 (uses the !reset tag).
+
+services:
+  db:
+    ports: !reset []
+
+  api:
+    ports: !reset []
+    environment:
+      # The API is reachable only through Traefik (nothing is published), so trust its
+      # X-Forwarded-For. Rate limiting then keys on the real client IP.
+      FORWARDED_ALLOW_IPS: "*"
+    networks:
+      - default
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:?TRAEFIK_NETWORK must be set in .env}"
+      - "traefik.http.routers.kalaai-api.rule=Host(`${KALAAI_HOST:?KALAAI_HOST must be set in .env}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.kalaai-api.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.kalaai-api.tls=true"
+      - "traefik.http.routers.kalaai-api.tls.certresolver=${TRAEFIK_CERTRESOLVER:?TRAEFIK_CERTRESOLVER must be set in .env}"
+      - "traefik.http.routers.kalaai-api.priority=20"
+      - "traefik.http.services.kalaai-api.loadbalancer.server.port=8000"
+
+  web:
+    ports: !reset []
+    networks:
+      - default
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:?TRAEFIK_NETWORK must be set in .env}"
+      - "traefik.http.routers.kalaai-web.rule=Host(`${KALAAI_HOST:?KALAAI_HOST must be set in .env}`)"
+      - "traefik.http.routers.kalaai-web.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.kalaai-web.tls=true"
+      - "traefik.http.routers.kalaai-web.tls.certresolver=${TRAEFIK_CERTRESOLVER:?TRAEFIK_CERTRESOLVER must be set in .env}"
+      - "traefik.http.routers.kalaai-web.priority=10"
+      - "traefik.http.services.kalaai-web.loadbalancer.server.port=8080"
+
+networks:
+  proxy:
+    external: true
+    name: ${TRAEFIK_NETWORK:?TRAEFIK_NETWORK must be set in .env}
