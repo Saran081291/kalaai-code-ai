@@ -223,4 +223,7 @@ files that drove it are kept in the repo:
 - Student uploads are limited to 5 MB and 50 files, and zips are checked for path traversal.
 - Submissions run as background tasks, and each status change is saved; a failed run stores
   its error and can be retried. A failure while *fetching* code does not use up an attempt.
-- There is no license file yet. Add one before inviting outside contributions.
+
+## License
+
+[MIT](LICENSE) © 2026 Saran081291
