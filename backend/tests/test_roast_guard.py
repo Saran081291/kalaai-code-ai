@@ -80,6 +80,8 @@ def test_profanity_blocked(bad: str) -> None:
         "Hindu or Muslim code style",
         "You code like a girl",
         "Brainless student",
+        "Idhu paatha kudumbam kooda moka la irukkum",
+        "Kudumbathula yaarum idha paakka maatanga",
     ],
 )
 def test_personal_attacks_and_identity_blocked(attack: str) -> None:
@@ -105,6 +107,8 @@ def test_punchline_profanity_blocked() -> None:
         "Dictionary use pannu",
         "Scrap that loop",
         "Bun parotta, kari dosai, Jigarthanda",
+        "Meenakshi Amman kovil gopuram maari strong-a aagum",
+        "Set font-family in the stylesheet",
     ],
 )
 def test_no_false_positives(safe: str) -> None:

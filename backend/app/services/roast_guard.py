@@ -118,6 +118,9 @@ _IDENTITY_WORDS: tuple[str, ...] = (
     r"jaati\w*",
     r"religio\w*",
     r"madham",
+    # Family words are off-limits even without a possessive ("kudumbam kooda moka la irukkum").
+    r"kudumb\w*",
+    r"kudumpam\w*",
     r"hindu\w*",
     r"muslim\w*",
     r"islam\w*",
