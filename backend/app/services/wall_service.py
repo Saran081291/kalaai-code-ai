@@ -38,6 +38,15 @@ from app.services.access import ensure_course_member, get_roast_or_404, roast_co
 
 logger = logging.getLogger(__name__)
 
+FALLBACK_FIRST_NAME = "Thambi"
+
+
+def first_name(full_name: str | None) -> str:
+    """Return the first whitespace-separated token of ``full_name`` (or ``"Thambi"``)."""
+    tokens = (full_name or "").split()
+    return tokens[0] if tokens else FALLBACK_FIRST_NAME
+
+
 SHARE_SLUG_LENGTH = 10
 _Ts = TypeVarTuple("_Ts")
 _MAX_SLUG_ATTEMPTS = 10
@@ -293,7 +302,7 @@ def get_roast_wall(
             punchline=row.punchline,
             content=row.content,
             spice_level=row.spice_level,
-            student_name=row.full_name,
+            student_name=first_name(row.full_name),
             student_avatar_url=row.avatar_url,
             assignment_title=row.title,
             effective_score=row.effective_score,

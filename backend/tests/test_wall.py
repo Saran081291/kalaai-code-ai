@@ -304,7 +304,8 @@ def test_wall_only_shows_shared_visible_roasts_of_course(
     assert page["page"] == 1 and page["pageSize"] == 20
     (item,) = page["items"]
     assert item["id"] == visible.roast.id
-    assert item["studentName"] == "Alice Kumar"
+    assert item["studentName"] == "Alice"  # first name only, never the surname
+    assert "Kumar" not in res.text
     assert item["assignmentTitle"] == "Bun Parotta API"
     assert item["effectiveScore"] == 90  # override wins
     assert item["maxScore"] == 100

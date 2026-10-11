@@ -8,16 +8,9 @@ from app.exceptions import NotFoundError
 from app.models import Assignment, Review, Roast, Submission, User
 from app.rate_limit import limiter
 from app.schemas.wall import PublicRoast
+from app.services.wall_service import first_name
 
 router = APIRouter(tags=["public"])
-
-FALLBACK_FIRST_NAME = "Thambi"
-
-
-def first_name(full_name: str | None) -> str:
-    """Return the first whitespace-separated token of ``full_name`` (or ``"Thambi"``)."""
-    tokens = (full_name or "").split()
-    return tokens[0] if tokens else FALLBACK_FIRST_NAME
 
 
 @router.get("/public/roasts/{slug}", response_model=PublicRoast)
