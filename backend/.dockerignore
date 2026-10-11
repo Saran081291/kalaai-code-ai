@@ -1,0 +1,40 @@
+# Only app/, alembic/, alembic.ini, requirements.txt and scripts/ are needed in the image.
+
+# Virtual environments
+.venv/
+venv/
+
+# Python caches / tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Tests are not shipped in the runtime image
+tests/
+
+# Secrets and local data
+.env
+.env.*
+!.env.example
+uploads/
+*.db
+*.sqlite3
+
+# VCS / editor / OS
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+.dockerignore

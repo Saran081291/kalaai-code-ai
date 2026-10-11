@@ -1,0 +1,31 @@
+# Dependencies are installed inside the image with `npm ci`
+node_modules/
+
+# Build / test output
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Secrets and local env files (VITE_API_URL comes in as a build arg)
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# VCS / editor / OS
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+.dockerignore

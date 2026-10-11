@@ -1,0 +1,64 @@
+"""Public (unauthenticated) endpoints: shareable roast cards."""
+
+from fastapi import APIRouter, Request
+from sqlalchemy import func, select
+
+from app.auth.dependencies import DbSession
+from app.exceptions import NotFoundError
+from app.models import Assignment, Review, Roast, Submission, User
+from app.rate_limit import limiter
+from app.schemas.wall import PublicRoast
+
+router = APIRouter(tags=["public"])
+
+FALLBACK_FIRST_NAME = "Thambi"
+
+
+def first_name(full_name: str | None) -> str:
+    """Return the first whitespace-separated token of ``full_name`` (or ``"Thambi"``)."""
+    tokens = (full_name or "").split()
+    return tokens[0] if tokens else FALLBACK_FIRST_NAME
+
+
+@router.get("/public/roasts/{slug}", response_model=PublicRoast)
+@limiter.limit("60/minute")
+def get_public_roast(request: Request, slug: str, db: DbSession) -> PublicRoast:
+    """Return a shared roast card by its share slug - no auth required.
+
+    Only exposes punchline, roast text, spice level, score, assignment title and the
+    student's first name. Never code, email, file contents or internal ids.
+    404 unless the roast is currently shared and not hidden.
+    """
+    row = db.execute(
+        select(
+            Roast.punchline,
+            Roast.content,
+            Roast.spice_level,
+            func.coalesce(Review.instructor_override_score, Review.total_score).label(
+                "effective_score"
+            ),
+            Assignment.max_score,
+            Assignment.title,
+            User.full_name,
+        )
+        .select_from(Roast)
+        .join(Review, Review.id == Roast.review_id)
+        .join(Submission, Submission.id == Review.submission_id)
+        .join(Assignment, Assignment.id == Submission.assignment_id)
+        .join(User, User.id == Submission.student_id)
+        .where(Roast.share_slug == slug, Roast.is_shared, ~Roast.is_hidden)
+    ).one_or_none()
+    if row is None:
+        raise NotFoundError("Roast not found")
+    return PublicRoast(
+        punchline=row.punchline,
+        content=row.content,
+        spice_level=row.spice_level,
+        effective_score=row.effective_score,
+        max_score=row.max_score,
+        assignment_title=row.title,
+        student_first_name=first_name(row.full_name),
+    )
+
+
+__all__ = ["router"]

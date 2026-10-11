@@ -1,0 +1,55 @@
+# Tool configuration only (dependencies live in requirements*.txt).
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["alembic/versions", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "S", "SIM", "ASYNC"]
+ignore = [
+    "B008",  # FastAPI Depends()/Query() in argument defaults is idiomatic
+    "S104",  # binding to 0.0.0.0 is intentional inside containers
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",  # assert is how pytest works
+    "S105",  # hardcoded test passwords
+    "S106",
+    "S311",
+]
+"alembic/**/*.py" = ["E501", "N999"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+exclude = ["alembic/", "tests/", ".venv/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["."]
+addopts = "-ra"
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["alembic/*", "tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]

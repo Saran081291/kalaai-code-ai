@@ -1,0 +1,75 @@
+# Kalaai Code - standalone development stack (hot reload)
+#   cp .env.example .env
+#   docker compose -f docker-compose.dev.yml up --build
+#
+#   web  -> http://localhost:5173   (Vite dev server, ./frontend mounted)
+#   api  -> http://localhost:8000   (uvicorn --reload, ./backend mounted)
+#   db   -> localhost:5432
+
+name: kalaai-code-dev
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kalaai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kalaai}
+      POSTGRES_DB: ${POSTGRES_DB:-kalaai_code}
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: kalaai-code-api:dev
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kalaai}:${POSTGRES_PASSWORD:-kalaai}@db:5432/${POSTGRES_DB:-kalaai_code}
+      ENVIRONMENT: development
+      FRONTEND_URL: http://localhost:5173
+      UPLOAD_DIR: /app/uploads
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    # Entrypoint waits for the DB and runs `alembic upgrade head`, then execs this:
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "app"]
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      # Keep the host's Windows/macOS venv out of the Linux container.
+      - /app/.venv
+      - uploads_dev:/app/uploads
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+  web:
+    image: node:20-alpine
+    working_dir: /app
+    command: ["sh", "-c", "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5173"]
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+      # File-change polling so hot reload works through Windows/macOS bind mounts.
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    depends_on:
+      - api
+    volumes:
+      - ./frontend:/app
+      # Linux node_modules live in an anonymous volume, not on the host.
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+
+volumes:
+  postgres_data_dev:
+  uploads_dev:
