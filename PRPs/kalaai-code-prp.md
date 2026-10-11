@@ -314,7 +314,7 @@ any step error → failed (error_message set, logged with submission_id); retry 
 | POST | /api/v1/roasts/{id}/reactions | Course member adds `reaction` (idempotent) |
 | DELETE | /api/v1/roasts/{id}/reactions/{reaction} | Remove own reaction |
 | GET | /api/v1/courses/{id}/leaderboard | Members: rank, student name, avatar, total best effective score, assignments completed |
-| GET | /api/v1/public/roasts/{share_slug} | Public, no auth: punchline, content, spiceLevel, effectiveScore/maxScore, assignmentTitle, studentFirstName — no code, no email |
+| GET | /api/v1/public/roasts/{share_slug} | Public, no auth: punchline, spiceLevel, effectiveScore/maxScore, studentFirstName only — no roast text, no code, no email |
 
 **Backend files:** `routers/roasts.py` (share/reactions), `routers/leaderboard.py`, `routers/public.py`, `services/leaderboard_service.py` (single SQL aggregate: best effective score per student per assignment, summed), `schemas/leaderboard.py`
 

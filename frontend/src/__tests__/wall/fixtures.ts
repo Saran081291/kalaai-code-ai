@@ -62,11 +62,9 @@ export function makeEntry(overrides: Partial<LeaderboardEntry> = {}): Leaderboar
 export function makePublicRoast(overrides: Partial<PublicRoast> = {}): PublicRoast {
   return {
     punchline: 'Indha code-ku Jigarthanda kudutha kooda sweet aagadhu!',
-    content: 'Nested loops ellam Madurai traffic maadhiri irukku.',
     spiceLevel: 'medium',
     effectiveScore: 31,
     maxScore: 50,
-    assignmentTitle: 'Sorting Algorithms',
     studentFirstName: 'Priya',
     ...overrides,
   };

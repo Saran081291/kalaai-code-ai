@@ -25,20 +25,18 @@ def first_name(full_name: str | None) -> str:
 def get_public_roast(request: Request, slug: str, db: DbSession) -> PublicRoast:
     """Return a shared roast card by its share slug - no auth required.
 
-    Only exposes punchline, roast text, spice level, score, assignment title and the
-    student's first name. Never code, email, file contents or internal ids.
+    Only exposes the punchline, spice level, score and the student's first name.
+    Never the full roast text, code, email, file contents or internal ids.
     404 unless the roast is currently shared and not hidden.
     """
     row = db.execute(
         select(
             Roast.punchline,
-            Roast.content,
             Roast.spice_level,
             func.coalesce(Review.instructor_override_score, Review.total_score).label(
                 "effective_score"
             ),
             Assignment.max_score,
-            Assignment.title,
             User.full_name,
         )
         .select_from(Roast)
@@ -52,11 +50,9 @@ def get_public_roast(request: Request, slug: str, db: DbSession) -> PublicRoast:
         raise NotFoundError("Roast not found")
     return PublicRoast(
         punchline=row.punchline,
-        content=row.content,
         spice_level=row.spice_level,
         effective_score=row.effective_score,
         max_score=row.max_score,
-        assignment_title=row.title,
         student_first_name=first_name(row.full_name),
     )
 

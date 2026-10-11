@@ -1,4 +1,4 @@
-import { Box, Divider, Flex, Heading, Stack, Text } from '@chakra-ui/react';
+import { Box, Flex, Heading, Stack, Text } from '@chakra-ui/react';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { ScoreRing } from '@/components/ui/ScoreRing';
@@ -46,23 +46,9 @@ export function ShareableRoastCard({ roast }: ShareableRoastCardProps) {
             <Text as="strong" color="text.primary">
               {roast.studentFirstName}
             </Text>{' '}
-            got roasted on{' '}
-            <Text as="strong" color="text.accent">
-              {roast.assignmentTitle}
-            </Text>
+            got roasted on Kalaai Code
           </Text>
         </Flex>
-
-        <Divider borderColor="border.subtle" />
-
-        <Box>
-          <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="wider" color="text.muted" mb={2}>
-            Full roast
-          </Text>
-          <Text whiteSpace="pre-wrap" wordBreak="break-word" fontSize={{ base: 'md', md: 'lg' }} lineHeight="tall">
-            {roast.content}
-          </Text>
-        </Box>
       </Stack>
     </GlassCard>
   );

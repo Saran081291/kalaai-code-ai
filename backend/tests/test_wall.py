@@ -428,11 +428,9 @@ def test_public_roast_exposes_only_card_fields(
     body = res.json()
     assert set(body) == {
         "punchline",
-        "content",
         "spiceLevel",
         "effectiveScore",
         "maxScore",
-        "assignmentTitle",
         "studentFirstName",
     }
     assert body["studentFirstName"] == "Alice"

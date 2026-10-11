@@ -48,11 +48,9 @@ export interface LeaderboardEntry {
 /** GET /public/roasts/{shareSlug} — no auth, no code, no email. */
 export interface PublicRoast {
   punchline: string;
-  content: string;
   spiceLevel: SpiceLevel;
   effectiveScore: number;
   maxScore: number;
-  assignmentTitle: string;
   studentFirstName: string;
 }
 

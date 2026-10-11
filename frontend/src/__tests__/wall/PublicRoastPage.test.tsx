@@ -27,14 +27,12 @@ afterEach(() => {
 });
 
 describe('PublicRoastPage', () => {
-  it('renders the punchline, first name and assignment without any email', async () => {
+  it('renders the punchline and first name without any email', async () => {
     getPublic.mockResolvedValue(makePublicRoast());
     const { container } = renderPublic();
 
     expect(await screen.findByText(/Jigarthanda kudutha kooda sweet aagadhu/)).toBeInTheDocument();
     expect(screen.getByText('Priya')).toBeInTheDocument();
-    expect(screen.getByText('Sorting Algorithms')).toBeInTheDocument();
-    expect(screen.getByText(/Madurai traffic/)).toBeInTheDocument();
     expect(screen.getByLabelText('Score 31 out of 50')).toBeInTheDocument();
     expect(getPublic).toHaveBeenCalledWith('abc123XYZ_');
     expect(container.textContent ?? '').not.toMatch(/@/);

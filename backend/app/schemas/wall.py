@@ -71,14 +71,15 @@ class LeaderboardEntry(CamelModel):
 
 
 class PublicRoast(CamelModel):
-    """Public share card - deliberately excludes code, email and internal ids."""
+    """Public share card: punchline, spice, score and first name only.
+
+    Deliberately excludes the full roast text, code, email and internal ids.
+    """
 
     punchline: str
-    content: str
     spice_level: SpiceLevel
     effective_score: int
     max_score: int
-    assignment_title: str
     student_first_name: str
 
 
