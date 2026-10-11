@@ -16,7 +16,7 @@ permissions:
 jobs:
   backend:
     name: Backend (ruff, mypy, alembic, pytest)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend
@@ -76,7 +76,7 @@ jobs:
 
   frontend:
     name: Frontend (lint, type-check, test, build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -108,7 +108,7 @@ jobs:
 
   docker:
     name: Docker images build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v7
