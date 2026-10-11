@@ -232,9 +232,10 @@ def _ensure_can_submit(db: Session, assignment: Assignment, user: User) -> tuple
         raise ConflictError("Assignment is not published", code="NOT_PUBLISHED")
 
     used, last = db.execute(
-        select(func.count(Submission.id), func.max(Submission.attempt_number)).where(
-            Submission.assignment_id == assignment.id, Submission.student_id == user.id
-        )
+        select(
+            func.count(Submission.id).filter(Submission.attempt_refunded.is_(False)),
+            func.max(Submission.attempt_number),
+        ).where(Submission.assignment_id == assignment.id, Submission.student_id == user.id)
     ).one()
     if used >= assignment.max_attempts:
         raise ConflictError(
@@ -389,6 +390,20 @@ def retry_submission(db: Session, submission_id: int, user: User) -> Submission:
     Rows still in progress are retryable only once stale (no update for the sweep cutoff).
     """
     submission = access.get_submission_for_user(db, submission_id, user)
+    if submission.attempt_refunded:
+        # Retrying takes the refunded attempt back; refuse if no attempt is left for it.
+        used = db.scalar(
+            select(func.count(Submission.id)).where(
+                Submission.assignment_id == submission.assignment_id,
+                Submission.student_id == submission.student_id,
+                Submission.attempt_refunded.is_(False),
+            )
+        )
+        if (used or 0) >= submission.assignment.max_attempts:
+            raise ConflictError(
+                f"Attempt limit reached ({submission.assignment.max_attempts})",
+                code="ATTEMPT_LIMIT",
+            )
     # Conditional UPDATE so two concurrent retries cannot both queue the pipeline.
     result = db.execute(
         update(Submission)
@@ -402,7 +417,7 @@ def retry_submission(db: Session, submission_id: int, user: User) -> Submission:
                 ),
             ),
         )
-        .values(status=SubmissionStatus.pending, error_message=None)
+        .values(status=SubmissionStatus.pending, error_message=None, attempt_refunded=False)
         .execution_options(synchronize_session=False)
     )
     if result.rowcount == 0:  # type: ignore[attr-defined]

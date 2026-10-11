@@ -51,6 +51,10 @@ class PipelineStepError(Exception):
         super().__init__(message)
 
 
+class FetchStepError(PipelineStepError):
+    """Fetching the code failed; the student's attempt is refunded."""
+
+
 def _set_status(db: Session, submission: Submission, status: SubmissionStatus) -> None:
     submission.status = status
     submission.error_message = None
@@ -65,7 +69,7 @@ def _fetch(db: Session, submission: Submission) -> None:
     try:
         if submission.source_type == SourceType.github:
             if not submission.github_url:
-                raise PipelineStepError(MSG_NO_FILES)
+                raise FetchStepError(MSG_NO_FILES)
             result = code_fetcher.fetch_github_repo(submission.github_url)
         else:
             result = code_fetcher.collect_uploaded_files(
@@ -73,10 +77,10 @@ def _fetch(db: Session, submission: Submission) -> None:
             )
     except code_fetcher.CodeFetchError as exc:
         logger.warning("Submission %s fetch failed (%s): %s", submission.id, exc.code, exc.message)
-        raise PipelineStepError(exc.message) from exc
+        raise FetchStepError(exc.message) from exc
 
     if not result.files:
-        raise PipelineStepError(MSG_NO_FILES)
+        raise FetchStepError(MSG_NO_FILES)
     for collected in result.files:
         db.add(
             SubmissionFile(
@@ -143,7 +147,7 @@ def _process(db: Session, submission_id: int) -> None:
     _set_status(db, submission, SubmissionStatus.completed)
 
 
-def _mark_failed(db: Session, submission_id: int, message: str) -> None:
+def _mark_failed(db: Session, submission_id: int, message: str, *, refund: bool = False) -> None:
     try:
         db.rollback()
         submission = db.get(Submission, submission_id)
@@ -151,8 +155,15 @@ def _mark_failed(db: Session, submission_id: int, message: str) -> None:
             return
         submission.status = SubmissionStatus.failed
         submission.error_message = message
+        if refund:
+            submission.attempt_refunded = True
         db.commit()
-        logger.info("Submission %s -> failed (%s)", submission_id, message)
+        logger.info(
+            "Submission %s -> failed (%s)%s",
+            submission_id,
+            message,
+            " [refunded]" if refund else "",
+        )
     except Exception:
         logger.exception("Pipeline: could not mark submission %s as failed", submission_id)
         db.rollback()
@@ -164,6 +175,8 @@ def run_pipeline(submission_id: int) -> None:
         with SessionLocal() as db:
             try:
                 _process(db, submission_id)
+            except FetchStepError as exc:
+                _mark_failed(db, submission_id, exc.message, refund=True)
             except PipelineStepError as exc:
                 _mark_failed(db, submission_id, exc.message)
             except ai_client.AIConfigError:

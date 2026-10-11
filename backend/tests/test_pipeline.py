@@ -506,6 +506,20 @@ def test_code_fetch_error_marks_failed_with_message(
     submission = reload_submission(session_factory, s.submission_id)
     assert submission.status == SubmissionStatus.failed
     assert submission.error_message == "Repo kidaikala thambi (not found)"
+    assert submission.attempt_refunded is True
+
+
+def test_ai_failure_does_not_refund_attempt(
+    db: Session, session_factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    s = seed(db)
+    install(monkeypatch, FakeAI(review=[ai_client.AIServiceError("down")]))
+
+    pipeline.run_pipeline(s.submission_id)
+
+    submission = reload_submission(session_factory, s.submission_id)
+    assert submission.status == SubmissionStatus.failed
+    assert submission.attempt_refunded is False
 
 
 def test_ai_not_configured_marks_failed(

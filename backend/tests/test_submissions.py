@@ -155,6 +155,7 @@ def make_submission(
     *,
     attempt: int = 1,
     status: SubmissionStatus = SubmissionStatus.completed,
+    refunded: bool = False,
 ) -> Submission:
     submission = Submission(
         assignment_id=assignment.id,
@@ -165,6 +166,7 @@ def make_submission(
         spice_level=SpiceLevel.mild,
         status=status,
         error_message="boom" if status == SubmissionStatus.failed else None,
+        attempt_refunded=refunded,
     )
     db.add(submission)
     db.commit()
@@ -375,6 +377,36 @@ def test_attempt_limit_409(client: TestClient, db: Session) -> None:
     assert third.json()["code"] == "ATTEMPT_LIMIT"
 
 
+def test_refunded_attempt_does_not_count_toward_limit(client: TestClient, db: Session) -> None:
+    student = make_user(db)
+    assignment = make_assignment(db, students=(student,), max_attempts=2)
+    make_submission(
+        db, assignment, student, attempt=1, status=SubmissionStatus.failed, refunded=True
+    )
+    payload = {"spiceLevel": "mild", "githubUrl": GITHUB_URL}
+
+    first = client.post(submit_url(assignment), data=payload, headers=auth(student))
+    second = client.post(submit_url(assignment), data=payload, headers=auth(student))
+    assert [first.status_code, second.status_code] == [202, 202]
+    assert [first.json()["attemptNumber"], second.json()["attemptNumber"]] == [2, 3]
+    third = client.post(submit_url(assignment), data=payload, headers=auth(student))
+    assert third.status_code == 409
+    assert third.json()["code"] == "ATTEMPT_LIMIT"
+
+
+def test_my_attempts_count_excludes_refunded(client: TestClient, db: Session) -> None:
+    student = make_user(db)
+    assignment = make_assignment(db, students=(student,), max_attempts=3)
+    make_submission(
+        db, assignment, student, attempt=1, status=SubmissionStatus.failed, refunded=True
+    )
+    make_submission(db, assignment, student, attempt=2)
+
+    res = client.get(f"/api/v1/assignments/{assignment.id}", headers=auth(student))
+    assert res.status_code == 200, res.text
+    assert res.json()["myAttemptsCount"] == 1
+
+
 def test_past_due_409_vs_allow_late(client: TestClient, db: Session) -> None:
     student = make_user(db)
     payload = {"spiceLevel": "mild", "githubUrl": GITHUB_URL}
@@ -552,6 +584,41 @@ def test_retry_only_when_failed(client: TestClient, db: Session, queued: list[in
 
     again = client.post(f"/api/v1/submissions/{failed.id}/retry", headers=auth(student))
     assert again.status_code == 409
+
+
+def test_retry_of_refunded_submission_takes_attempt_back(
+    client: TestClient, db: Session, queued: list[int]
+) -> None:
+    student = make_user(db)
+    assignment = make_assignment(db, students=(student,), max_attempts=2)
+    failed = make_submission(
+        db, assignment, student, attempt=1, status=SubmissionStatus.failed, refunded=True
+    )
+
+    res = client.post(f"/api/v1/submissions/{failed.id}/retry", headers=auth(student))
+    assert res.status_code == 202, res.text
+    db.refresh(failed)
+    assert failed.attempt_refunded is False
+    assert queued == [failed.id]
+
+
+def test_retry_of_refunded_submission_blocked_when_no_attempt_left(
+    client: TestClient, db: Session, queued: list[int]
+) -> None:
+    student = make_user(db)
+    assignment = make_assignment(db, students=(student,), max_attempts=2)
+    failed = make_submission(
+        db, assignment, student, attempt=1, status=SubmissionStatus.failed, refunded=True
+    )
+    make_submission(db, assignment, student, attempt=2)
+    make_submission(db, assignment, student, attempt=3)
+
+    res = client.post(f"/api/v1/submissions/{failed.id}/retry", headers=auth(student))
+    assert res.status_code == 409
+    assert res.json()["code"] == "ATTEMPT_LIMIT"
+    db.refresh(failed)
+    assert failed.attempt_refunded is True
+    assert queued == []
 
 
 def test_submit_rate_limited(

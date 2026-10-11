@@ -29,13 +29,20 @@ logger = logging.getLogger(__name__)
 
 # --- Helpers -----------------------------------------------------------------
 def attempt_counts(db: Session, student_id: int, assignment_ids: Iterable[int]) -> dict[int, int]:
-    """Return ``{assignment_id: number of submissions by student}`` in one grouped query."""
+    """Return ``{assignment_id: attempts used by student}`` in one grouped query.
+
+    Submissions whose fetch failed (``attempt_refunded``) are not counted.
+    """
     ids = list(set(assignment_ids))
     if not ids:
         return {}
     stmt = (
         select(Submission.assignment_id, func.count(Submission.id))
-        .where(Submission.student_id == student_id, Submission.assignment_id.in_(ids))
+        .where(
+            Submission.student_id == student_id,
+            Submission.assignment_id.in_(ids),
+            Submission.attempt_refunded.is_(False),
+        )
         .group_by(Submission.assignment_id)
     )
     return {assignment_id: count for assignment_id, count in db.execute(stmt)}

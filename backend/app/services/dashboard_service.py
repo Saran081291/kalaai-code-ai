@@ -112,7 +112,7 @@ def _upcoming_assignments(db: Session, student_id: int) -> list[UpcomingAssignme
                 "completed_count"
             ),
         )
-        .where(Submission.student_id == student_id)
+        .where(Submission.student_id == student_id, Submission.attempt_refunded.is_(False))
         .group_by(Submission.assignment_id)
         .subquery()
     )

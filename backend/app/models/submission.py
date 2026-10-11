@@ -57,6 +57,10 @@ class Submission(Base):
         server_default=text("'pending'"),
     )
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # True when the pipeline failed while fetching code: the attempt is given back.
+    attempt_refunded: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     is_late: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
