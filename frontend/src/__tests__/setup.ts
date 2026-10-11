@@ -3,7 +3,7 @@ import { cleanup, configure } from '@testing-library/react';
 import { afterEach } from 'vitest';
 
 // Lazy-loaded pages can take >1s on a cold/busy machine; avoid flaky findBy* timeouts.
-configure({ asyncUtilTimeout: 5000 });
+configure({ asyncUtilTimeout: 10_000 });
 
 // jsdom lacks Element.scrollTo (used by Chakra Menu and the code viewer).
 if (!Element.prototype.scrollTo) {

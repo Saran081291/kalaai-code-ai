@@ -41,5 +41,8 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     css: false,
     restoreMocks: true,
+    // jsdom + Chakra renders are slow on shared CI runners; the 5s default flakes under load.
+    testTimeout: 15_000,
+    hookTimeout: 15_000,
   },
 });
