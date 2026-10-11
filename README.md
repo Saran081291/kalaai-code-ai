@@ -1,5 +1,7 @@
 # MicroSaaS Template
 
+[![CI](https://github.com/Saran081291/kalaai-code-ai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Saran081291/kalaai-code-ai/actions/workflows/ci.yml)
+
 > **Clone. Define. Build.** Full-stack SaaS in minutes.
 
 ---
