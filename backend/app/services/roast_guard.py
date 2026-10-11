@@ -199,6 +199,9 @@ _ATTACK_RES = tuple(re.compile(p, re.IGNORECASE) for p in _PERSONAL_ATTACK_PATTE
 _CENSORED_RE = re.compile(r"\b[a-z]{1,3}(?:[\*\#\@\$!]+[a-z]{1,5}\b|\*{2,}(?!\w))", re.IGNORECASE)
 _CENSORED_MIN_CHARS = 4
 _WORD_RE = re.compile(r"\S+")
+# Roasts must be Tanglish (Tamil words in English letters); Tamil script is a style-guide breach.
+_TAMIL_BLOCK_START, _TAMIL_BLOCK_END = 0x0B80, 0x0BFF  # Unicode "Tamil" block
+_TAMIL_SCRIPT_RE = re.compile(f"[{chr(_TAMIL_BLOCK_START)}-{chr(_TAMIL_BLOCK_END)}]+")
 
 
 @dataclass(frozen=True)
@@ -241,6 +244,9 @@ def find_violations(text: str) -> list[str]:
     for pattern in _ATTACK_RES:
         for match in pattern.finditer(text):
             reasons.append(f"personal attack: {match.group(0).lower()!r}")
+    for match in _TAMIL_SCRIPT_RE.finditer(text):
+        reasons.append(f"non-Tanglish script: {match.group(0)!r}")
+        break
     for match in _CENSORED_RE.finditer(text):
         if len(match.group(0)) < _CENSORED_MIN_CHARS:
             continue

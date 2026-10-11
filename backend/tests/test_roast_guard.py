@@ -89,6 +89,20 @@ def test_personal_attacks_and_identity_blocked(attack: str) -> None:
     assert not result.ok, attack
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Dei thambi, `range(1, n)` nu போட்டுட்டu 99-la stop",
+        "கேக்குது ellam semma",
+    ],
+)
+def test_tamil_script_blocked(text: str) -> None:
+    result = check_roast(f"{CLEAN} {text}", "clean punchline")
+    assert not result.ok
+    assert any("non-Tanglish script" in reason for reason in result.reasons)
+    assert not check_roast(CLEAN, text).ok  # also rejected in the punchline
+
+
 def test_punchline_profanity_blocked() -> None:
     result = check_roast(CLEAN, "Idhu crap code")
     assert not result.ok

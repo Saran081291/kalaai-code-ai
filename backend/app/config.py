@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     # OpenAI (used only when AI_PROVIDER=openai)
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_MODEL: str = "gpt-5.5"
 
     # Anthropic Claude
     ANTHROPIC_API_KEY: str = ""
