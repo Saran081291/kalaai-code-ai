@@ -172,7 +172,7 @@ export default function SubmitPage() {
               </HStack>
               {!noAttemptsLeft && (
                 <Text fontSize="sm" color="text.muted">
-                  This will be attempt #{attemptsUsed + 1}
+                  This will be attempt #{assignment.myNextAttemptNumber ?? attemptsUsed + 1}
                 </Text>
               )}
             </Flex>

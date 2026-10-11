@@ -98,6 +98,21 @@ describe('SubmitPage', { timeout: 15_000 }, () => {
     expect(screen.getByText('Roast code-ku mattum dhaan, person-ku illa 🙏')).toBeInTheDocument();
   });
 
+  it('labels the next attempt with the number the server will assign', async () => {
+    // One counted attempt, but a refunded failed fetch already took #2.
+    mockedGet.mockResolvedValue(makeAssignment({ myAttemptsCount: 1, myNextAttemptNumber: 3 }));
+    renderPage();
+
+    expect(await screen.findByText('This will be attempt #3')).toBeInTheDocument();
+  });
+
+  it('falls back to attempts used + 1 when the server sends no next attempt number', async () => {
+    mockedGet.mockResolvedValue(makeAssignment({ myAttemptsCount: 1 }));
+    renderPage();
+
+    expect(await screen.findByText('This will be attempt #2')).toBeInTheDocument();
+  });
+
   it('submits a GitHub URL and navigates to the result page', async () => {
     const user = userEvent.setup();
     mockedGet.mockResolvedValue(makeAssignment());

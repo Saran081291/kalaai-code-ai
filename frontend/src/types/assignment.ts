@@ -35,6 +35,8 @@ export interface Assignment {
   rubricCriteria?: RubricCriterion[];
   /** Student only: number of attempts already used (GET /assignments/{id}). */
   myAttemptsCount?: number;
+  /** Student only: the attempt number the next submission will get (can skip refunded failures). */
+  myNextAttemptNumber?: number;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

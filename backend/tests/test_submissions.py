@@ -407,6 +407,35 @@ def test_my_attempts_count_excludes_refunded(client: TestClient, db: Session) ->
     assert res.json()["myAttemptsCount"] == 1
 
 
+def test_my_next_attempt_number_matches_server_numbering(client: TestClient, db: Session) -> None:
+    student = make_user(db)
+    assignment = make_assignment(db, students=(student,), max_attempts=3)
+    fresh = client.get(f"/api/v1/assignments/{assignment.id}", headers=auth(student))
+    assert fresh.json()["myNextAttemptNumber"] == 1
+
+    make_submission(db, assignment, student, attempt=1)
+    make_submission(
+        db, assignment, student, attempt=2, status=SubmissionStatus.failed, refunded=True
+    )
+    res = client.get(f"/api/v1/assignments/{assignment.id}", headers=auth(student))
+    body = res.json()
+    # One counted attempt, but #2 is taken by the refunded failure, so the next one is #3.
+    assert body["myAttemptsCount"] == 1
+    assert body["myNextAttemptNumber"] == 3
+
+    listed = client.get(
+        f"/api/v1/courses/{assignment.course_id}/assignments", headers=auth(student)
+    )
+    assert listed.json()[0]["myNextAttemptNumber"] == 3
+
+    created = client.post(
+        submit_url(assignment),
+        data={"spiceLevel": "mild", "githubUrl": GITHUB_URL},
+        headers=auth(student),
+    )
+    assert created.json()["attemptNumber"] == 3
+
+
 def test_past_due_409_vs_allow_late(client: TestClient, db: Session) -> None:
     student = make_user(db)
     payload = {"spiceLevel": "mild", "githubUrl": GITHUB_URL}

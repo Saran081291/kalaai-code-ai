@@ -48,13 +48,37 @@ def attempt_counts(db: Session, student_id: int, assignment_ids: Iterable[int]) 
     return {assignment_id: count for assignment_id, count in db.execute(stmt)}
 
 
+def next_attempt_numbers(
+    db: Session, student_id: int, assignment_ids: Iterable[int]
+) -> dict[int, int]:
+    """Return ``{assignment_id: attempt number the next submission will get}``.
+
+    Mirrors the numbering in ``submission_service`` (highest attempt number + 1, refunded
+    submissions included), so it can differ from ``attempts used + 1``. Assignments the
+    student has not submitted to are omitted (their next number is 1).
+    """
+    ids = list(set(assignment_ids))
+    if not ids:
+        return {}
+    stmt = (
+        select(Submission.assignment_id, func.max(Submission.attempt_number))
+        .where(Submission.student_id == student_id, Submission.assignment_id.in_(ids))
+        .group_by(Submission.assignment_id)
+    )
+    return {assignment_id: int(last) + 1 for assignment_id, last in db.execute(stmt)}
+
+
 def to_assignment_out(
-    assignment: Assignment, my_attempts_count: int | None = None
+    assignment: Assignment,
+    my_attempts_count: int | None = None,
+    my_next_attempt_number: int | None = None,
 ) -> AssignmentOut:
     """Build the API representation (``rubric_criteria`` should be loaded / loadable)."""
     out = AssignmentOut.model_validate(assignment)
     if my_attempts_count is not None:
         out.my_attempts_count = my_attempts_count
+    if my_next_attempt_number is not None:
+        out.my_next_attempt_number = my_next_attempt_number
     return out
 
 
@@ -63,7 +87,10 @@ def _out_for_user(db: Session, assignment: Assignment, user: User) -> Assignment
     if is_course_owner(assignment.course, user):
         return to_assignment_out(assignment)
     count = attempt_counts(db, user.id, [assignment.id]).get(assignment.id, 0)
-    return to_assignment_out(assignment, my_attempts_count=count)
+    next_number = next_attempt_numbers(db, user.id, [assignment.id]).get(assignment.id, 1)
+    return to_assignment_out(
+        assignment, my_attempts_count=count, my_next_attempt_number=next_number
+    )
 
 
 def _rubric_mismatch(total: int, max_score: int, count: int) -> BadRequestError:
@@ -143,8 +170,16 @@ def list_for_course(db: Session, course_id: int, user: User) -> list[AssignmentO
     assignments = list(db.scalars(stmt))
     if owner:
         return [to_assignment_out(a) for a in assignments]
-    counts = attempt_counts(db, user.id, (a.id for a in assignments))
-    return [to_assignment_out(a, my_attempts_count=counts.get(a.id, 0)) for a in assignments]
+    counts = attempt_counts(db, user.id, [a.id for a in assignments])
+    next_numbers = next_attempt_numbers(db, user.id, [a.id for a in assignments])
+    return [
+        to_assignment_out(
+            a,
+            my_attempts_count=counts.get(a.id, 0),
+            my_next_attempt_number=next_numbers.get(a.id, 1),
+        )
+        for a in assignments
+    ]
 
 
 def create_assignment(
@@ -262,6 +297,7 @@ def replace_rubric(
 
 __all__ = [
     "attempt_counts",
+    "next_attempt_numbers",
     "create_assignment",
     "delete_assignment",
     "get_assignment",

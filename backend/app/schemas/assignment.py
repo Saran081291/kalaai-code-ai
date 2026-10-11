@@ -134,7 +134,9 @@ class RubricUpdate(CamelModel):
 class AssignmentOut(CamelModel):
     """An assignment (``Assignment`` in the frontend).
 
-    ``myAttemptsCount`` is only serialised for students (omitted when ``None``).
+    ``myAttemptsCount`` and ``myNextAttemptNumber`` are only serialised for students
+    (omitted when ``None``). The next attempt number can exceed ``myAttemptsCount + 1``
+    because refunded failed fetches keep their number but no longer count as attempts.
     """
 
     id: int
@@ -150,6 +152,7 @@ class AssignmentOut(CamelModel):
     is_published: bool
     rubric_criteria: list[RubricCriterionOut] = Field(default_factory=list)
     my_attempts_count: int | None = Field(default=None, exclude_if=lambda value: value is None)
+    my_next_attempt_number: int | None = Field(default=None, exclude_if=lambda value: value is None)
     created_at: datetime
     updated_at: datetime
 
