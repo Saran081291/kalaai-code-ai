@@ -1,4 +1,6 @@
-"""Thin wrapper around the Anthropic SDK - the ONLY module that imports ``anthropic``.
+"""Thin wrapper around the AI SDKs - the ONLY module that imports ``anthropic`` / ``openai``.
+
+``settings.AI_PROVIDER`` selects the backend: ``anthropic`` (default) or ``openai``.
 
 Callers use :func:`generate_structured` to get a JSON object that matches a JSON schema.
 Tests monkeypatch ``app.services.ai_client.generate_structured`` so the real API is never hit.
@@ -28,6 +30,7 @@ from app.config import settings
 
 if TYPE_CHECKING:
     import anthropic
+    import openai
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +54,11 @@ class AIError(Exception):
 
 
 class AIConfigError(AIError):
-    """The AI client is not configured (e.g. ``ANTHROPIC_API_KEY`` is empty)."""
+    """The AI client is not configured (e.g. the provider's API key is empty)."""
 
 
 class AIServiceError(AIError):
-    """The Anthropic API call failed (network, HTTP error, refusal)."""
+    """The AI API call failed (network, HTTP error, refusal)."""
 
 
 class AIOutputError(AIServiceError):
@@ -124,6 +127,33 @@ def _with_additional_properties_false(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 def generate_structured(
+    *,
+    system: str,
+    user_content: str,
+    tool_name: str,
+    tool_description: str,
+    input_schema: dict[str, object],
+    max_tokens: int | None = None,
+    effort: Effort | None = None,
+) -> AIResult:
+    """Ask the configured provider for a JSON object matching ``input_schema``.
+
+    Dispatches on ``settings.AI_PROVIDER``; see :func:`_generate_anthropic` for the
+    argument and error contract, which both providers share.
+    """
+    generate = _generate_openai if settings.AI_PROVIDER == "openai" else _generate_anthropic
+    return generate(
+        system=system,
+        user_content=user_content,
+        tool_name=tool_name,
+        tool_description=tool_description,
+        input_schema=input_schema,
+        max_tokens=max_tokens,
+        effort=effort,
+    )
+
+
+def _generate_anthropic(
     *,
     system: str,
     user_content: str,
@@ -229,6 +259,120 @@ def generate_structured(
     )
 
 
+_openai_client: openai.OpenAI | None = None
+
+
+def get_openai_client() -> openai.OpenAI:
+    """Return the lazily constructed, process-wide OpenAI client.
+
+    Raises:
+        AIConfigError: If ``OPENAI_API_KEY`` is not set.
+    """
+    global _openai_client
+    if _openai_client is not None:
+        return _openai_client
+    if not settings.OPENAI_API_KEY:
+        raise AIConfigError("OPENAI_API_KEY is not configured")
+    import openai
+
+    with _client_lock:
+        if _openai_client is None:
+            _openai_client = openai.OpenAI(
+                api_key=settings.OPENAI_API_KEY,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+                max_retries=SDK_MAX_RETRIES,
+            )
+    return _openai_client
+
+
+def _generate_openai(
+    *,
+    system: str,
+    user_content: str,
+    tool_name: str,
+    tool_description: str,
+    input_schema: dict[str, object],
+    max_tokens: int | None = None,
+    effort: Effort | None = None,  # noqa: ARG001 - Anthropic-only knob, accepted for parity
+) -> AIResult:
+    """OpenAI implementation of :func:`generate_structured` (JSON-schema response format).
+
+    Raises:
+        AIConfigError: Missing API key.
+        AIServiceError: API/network failure or a refusal.
+        AIOutputError: Output truncated or not a JSON object.
+    """
+    import openai
+
+    client = get_openai_client()
+    model = settings.OPENAI_MODEL
+    full_system = (
+        f"{system.rstrip()}\n\n"
+        f"Return your answer as the `{tool_name}` JSON object only: {tool_description}"
+    )
+    try:
+        completion = client.chat.completions.create(
+            model=model,
+            max_completion_tokens=max_tokens or settings.CLAUDE_MAX_TOKENS,
+            messages=[
+                {"role": "system", "content": full_system},
+                {"role": "user", "content": user_content},
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": tool_name,
+                    "schema": _with_additional_properties_false(dict(input_schema)),
+                    "strict": False,
+                },
+            },
+        )
+    except openai.AuthenticationError as exc:
+        logger.error("OpenAI authentication failed: %s", exc)
+        raise AIServiceError("AI service authentication failed") from exc
+    except openai.RateLimitError as exc:
+        logger.warning("OpenAI rate limit hit after retries: %s", exc)
+        raise AIServiceError("AI service is rate limited") from exc
+    except openai.BadRequestError as exc:
+        logger.error("OpenAI rejected the request: %s", exc)
+        raise AIServiceError("AI service rejected the request") from exc
+    except openai.APIStatusError as exc:
+        logger.error("OpenAI API error %s: %s", exc.status_code, exc)
+        raise AIServiceError(f"AI service error ({exc.status_code})") from exc
+    except openai.APIConnectionError as exc:
+        logger.error("OpenAI connection error: %s", exc)
+        raise AIServiceError("Could not reach the AI service") from exc
+
+    choice = completion.choices[0]
+    if choice.finish_reason == "content_filter" or choice.message.refusal:
+        raise AIServiceError("The AI declined to answer this request")
+    if choice.finish_reason == "length":
+        raise AIOutputError("AI output was truncated (max tokens reached)")
+    try:
+        data = json.loads(choice.message.content or "")
+    except json.JSONDecodeError as exc:
+        raise AIOutputError("AI output was not valid JSON") from exc
+    if not isinstance(data, dict):
+        raise AIOutputError("AI output was not a JSON object")
+
+    usage = completion.usage
+    input_tokens = int(usage.prompt_tokens) if usage else 0
+    output_tokens = int(usage.completion_tokens) if usage else 0
+    logger.info(
+        "AI call %s ok model=%s in=%s out=%s",
+        tool_name,
+        completion.model,
+        input_tokens,
+        output_tokens,
+    )
+    return AIResult(
+        data=data,
+        model=str(completion.model),
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
+
+
 __all__ = [
     "AIConfigError",
     "AIError",
@@ -238,4 +382,5 @@ __all__ = [
     "Effort",
     "generate_structured",
     "get_client",
+    "get_openai_client",
 ]

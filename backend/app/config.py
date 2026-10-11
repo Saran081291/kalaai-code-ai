@@ -1,6 +1,6 @@
 """Application settings loaded from environment variables / ``.env``."""
 
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
+
+    # AI provider: "anthropic" (default) or "openai"
+    AI_PROVIDER: Literal["anthropic", "openai"] = "anthropic"
+
+    # OpenAI (used only when AI_PROVIDER=openai)
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
 
     # Anthropic Claude
     ANTHROPIC_API_KEY: str = ""

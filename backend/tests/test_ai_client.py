@@ -135,3 +135,105 @@ def test_get_client_builds_once(monkeypatch: pytest.MonkeyPatch) -> None:
     first = ai_client.get_client()
     assert ai_client.get_client() is first
     monkeypatch.setattr(ai_client, "_client", None)
+
+
+# --- OpenAI provider --------------------------------------------------------------------
+
+
+def _openai_completion(
+    content: str | None,
+    finish_reason: str = "stop",
+    refusal: str | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        model="gpt-test",
+        choices=[
+            SimpleNamespace(
+                finish_reason=finish_reason,
+                message=SimpleNamespace(content=content, refusal=refusal),
+            )
+        ],
+        usage=SimpleNamespace(prompt_tokens=13, completion_tokens=5),
+    )
+
+
+class FakeOpenAI:
+    def __init__(self, completion: SimpleNamespace | None = None, error: Exception | None = None):
+        self.completion = completion
+        self.error = error
+        self.kwargs: dict[str, Any] = {}
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
+
+    def _create(self, **kwargs: Any) -> SimpleNamespace:
+        self.kwargs = kwargs
+        if self.error is not None:
+            raise self.error
+        assert self.completion is not None
+        return self.completion
+
+
+def _call_openai(client: FakeOpenAI, monkeypatch: pytest.MonkeyPatch) -> ai_client.AIResult:
+    monkeypatch.setattr(settings, "AI_PROVIDER", "openai")
+    monkeypatch.setattr(ai_client, "get_openai_client", lambda: client)
+    return ai_client.generate_structured(
+        system="sys",
+        user_content="user",
+        tool_name="submit_review",
+        tool_description="desc",
+        input_schema=SCHEMA,
+    )
+
+
+def test_openai_success_returns_data_and_usage(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = FakeOpenAI(_openai_completion(json.dumps({"a": {"b": 1}})))
+    result = _call_openai(client, monkeypatch)
+    assert result.data == {"a": {"b": 1}}
+    assert (result.model, result.input_tokens, result.output_tokens) == ("gpt-test", 13, 5)
+    assert client.kwargs["model"] == settings.OPENAI_MODEL
+    schema = client.kwargs["response_format"]["json_schema"]["schema"]
+    assert schema["additionalProperties"] is False
+
+
+def test_openai_missing_key_raises_config_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "AI_PROVIDER", "openai")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+    monkeypatch.setattr(ai_client, "_openai_client", None)
+    with pytest.raises(ai_client.AIConfigError):
+        ai_client.generate_structured(
+            system="s", user_content="u", tool_name="t", tool_description="d", input_schema=SCHEMA
+        )
+
+
+@pytest.mark.parametrize(
+    ("completion", "error_type"),
+    [
+        (_openai_completion("{}", finish_reason="length"), ai_client.AIOutputError),
+        (_openai_completion("not json"), ai_client.AIOutputError),
+        (_openai_completion("[1]"), ai_client.AIOutputError),
+        (_openai_completion(None, refusal="no"), ai_client.AIServiceError),
+        (_openai_completion("{}", finish_reason="content_filter"), ai_client.AIServiceError),
+    ],
+)
+def test_openai_bad_output_maps_to_errors(
+    completion: SimpleNamespace,
+    error_type: type[Exception],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(error_type):
+        _call_openai(FakeOpenAI(completion), monkeypatch)
+
+
+def test_openai_api_errors_map_to_service_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    import openai
+
+    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    errors: list[Exception] = [
+        openai.AuthenticationError("x", response=httpx.Response(401, request=request), body=None),
+        openai.RateLimitError("x", response=httpx.Response(429, request=request), body=None),
+        openai.BadRequestError("x", response=httpx.Response(400, request=request), body=None),
+        openai.InternalServerError("x", response=httpx.Response(500, request=request), body=None),
+        openai.APIConnectionError(request=request),
+    ]
+    for err in errors:
+        with pytest.raises(ai_client.AIServiceError):
+            _call_openai(FakeOpenAI(error=err), monkeypatch)
