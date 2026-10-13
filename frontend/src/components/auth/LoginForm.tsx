@@ -1,5 +1,5 @@
 import { Alert, AlertDescription, AlertIcon, Stack } from '@chakra-ui/react';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 
 import { AnimatedInput } from '@/components/ui/AnimatedInput';
 import { GradientButton } from '@/components/ui/GradientButton';
@@ -38,12 +38,21 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   const [errors, setErrors] = useState<LoginErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
+    // Read the live DOM values: browser autofill and password managers can fill a field
+    // without firing a change event, which leaves the React state stale.
+    const emailValue = emailRef.current?.value ?? email;
+    const passwordValue = passwordRef.current?.value ?? password;
+    setEmail(emailValue);
+    setPassword(passwordValue);
+
     const nextErrors: LoginErrors = {
-      email: validateEmail(email),
-      password: validateLoginPassword(password),
+      email: validateEmail(emailValue),
+      password: validateLoginPassword(passwordValue),
     };
     setErrors(nextErrors);
     setSubmitError(null);
@@ -51,7 +60,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
     setIsSubmitting(true);
     try {
-      const user = await login({ email: email.trim(), password });
+      const user = await login({ email: emailValue.trim(), password: passwordValue });
       onSuccess(user);
     } catch (err) {
       setSubmitError(loginErrorMessage(err));
@@ -68,6 +77,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         </Alert>
       )}
       <AnimatedInput
+        ref={emailRef}
         label="Email"
         name="email"
         type="email"
@@ -80,6 +90,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         isDisabled={isSubmitting}
       />
       <PasswordField
+        ref={passwordRef}
         label="Password"
         name="password"
         autoComplete="current-password"
