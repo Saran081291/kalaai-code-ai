@@ -54,10 +54,14 @@ git config core.sshCommand "ssh -i ~/.ssh/kalaai_deploy -o IdentitiesOnly=yes"
 bash deploy/discover-traefik.sh
 ```
 
-It prints the Traefik container, its Docker **network**, the **certificate resolver** name and
-the HTTPS **entrypoint**. Typical values for the Hostinger n8n template:
-`TRAEFIK_NETWORK=root_default`, `TRAEFIK_CERTRESOLVER=mytlschallenge`, `TRAEFIK_ENTRYPOINT=websecure`.
-Use what the script prints, not these examples.
+It prints the Traefik container, the **certificate resolver** name and the HTTPS **entrypoint**.
+Use what the script prints (for example `TRAEFIK_CERTRESOLVER=letsencrypt`,
+`TRAEFIK_ENTRYPOINT=websecure`).
+
+The script also lists Traefik's network. If it says `host`, Traefik runs in host network mode
+(the Hostinger n8n template does) and reaches the containers directly on their bridge network:
+nothing to configure. This setup does not join any shared Traefik network. (If your Traefik sits
+on a user-defined bridge network instead, you must attach `api` and `web` to that network.)
 
 ## 3. Create `.env`
 
@@ -70,7 +74,7 @@ Fill in:
 
 | Variable | Value |
 |----------|-------|
-| `TRAEFIK_NETWORK`, `TRAEFIK_CERTRESOLVER` | from step 2 |
+| `TRAEFIK_CERTRESOLVER`, `TRAEFIK_ENTRYPOINT` | from step 2 |
 | `OPENAI_API_KEY` | your key (or set `AI_PROVIDER=anthropic` and `ANTHROPIC_API_KEY`) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | optional, see step 6 |
 
@@ -137,10 +141,9 @@ Logs: `docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f a
 
 | Symptom | Likely cause and fix |
 |---------|----------------------|
-| Plain `404 page not found` from the site | Traefik is not routing to the containers. Check `TRAEFIK_NETWORK` matches Traefik's network, then `docker compose ... up -d` again. `docker logs <traefik-container>` shows router errors. |
+| Plain `404 page not found` from the site | Traefik is not routing to the containers. Check `KALAAI_HOST` matches the address you open and the containers are up, then `docker compose ... up -d` again. `docker logs <traefik-container>` shows router errors. |
 | Browser warns the certificate is invalid / self-signed | The resolver name is wrong or the certificate is not issued yet. Check `TRAEFIK_CERTRESOLVER`, wait a minute, and read `docker logs <traefik-container> \| grep -i acme`. Let's Encrypt limits how many certificates one domain family can get per week; `sslip.io` is shared by many users, so if issuance is refused, switch to a DuckDNS name and change `KALAAI_HOST`, `FRONTEND_URL`, `ALLOWED_ORIGINS`, `VITE_API_URL` and `GOOGLE_REDIRECT_URI` to match. |
 | App loads but every request fails | `VITE_API_URL` was wrong when the image was built. Fix `.env` and rebuild: `docker compose ... up -d --build web`. |
 | `compose` error about `!reset` | Docker Compose is older than 2.24. Update Docker. |
-| `network ... not found` | `TRAEFIK_NETWORK` is wrong. List networks: `docker network ls`. |
 | Google error `redirect_uri_mismatch` | The redirect URI in Google Cloud Console must match `.env` exactly (https, no trailing slash). |
 | Sign-in blocked "Access blocked" | The account is not on the consent screen's Test users list. |

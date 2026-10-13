@@ -27,7 +27,7 @@ chmod 600 .env
 echo "Created .env (permissions 600) with a generated SECRET_KEY and POSTGRES_PASSWORD."
 echo
 echo "Still to fill in (nano .env):"
-echo "  TRAEFIK_NETWORK, TRAEFIK_CERTRESOLVER   <- bash deploy/discover-traefik.sh"
+echo "  TRAEFIK_CERTRESOLVER, TRAEFIK_ENTRYPOINT <- bash deploy/discover-traefik.sh"
 echo "  OPENAI_API_KEY (or set AI_PROVIDER=anthropic and ANTHROPIC_API_KEY)"
 echo "  GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET (optional)"
 echo

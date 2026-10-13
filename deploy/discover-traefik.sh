@@ -24,9 +24,9 @@ image="${line#*|}"
 echo "Traefik container : $name  ($image)"
 
 echo
-echo "== TRAEFIK_NETWORK  (Docker network(s) Traefik is attached to) =="
+echo "== Traefik network(s) (informational) =="
 docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' "$name" | sed '/^$/d' | sed 's/^/  /'
-echo "  -> pick the one your other apps (e.g. n8n) share with Traefik; usually the only one."
+echo "  -> 'host' = host network mode: Traefik reaches containers directly, nothing to set."
 
 # Static config arrives as command-line args (compose 'command:') or via a file.
 args="$(docker inspect -f '{{join .Args " "}} {{join .Config.Cmd " "}}' "$name" 2>/dev/null || true)"
@@ -56,4 +56,4 @@ for c in $(docker ps --format '{{.Names}}'); do
 done
 
 echo
-echo "Put the three values into .env as TRAEFIK_NETWORK, TRAEFIK_CERTRESOLVER, TRAEFIK_ENTRYPOINT."
+echo "Put the resolver and entrypoint into .env as TRAEFIK_CERTRESOLVER and TRAEFIK_ENTRYPOINT."
