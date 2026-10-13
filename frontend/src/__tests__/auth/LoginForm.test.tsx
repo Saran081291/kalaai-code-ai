@@ -36,6 +36,28 @@ describe('LoginPage / LoginForm', { timeout: TEST_TIMEOUT }, () => {
     expect(await screen.findByRole('heading', { name: 'Dashboard page' }, FIND_TIMEOUT)).toBeInTheDocument();
   });
 
+  it('submits values set by browser autofill, which fires no change event', async () => {
+    const user = userEvent.setup();
+    const auth = renderLogin();
+
+    // Chrome autofill / password managers can set the DOM value without an input event,
+    // so React state stays empty while the field looks filled.
+    const email = screen.getByLabelText(/^email/i) as HTMLInputElement;
+    const password = screen.getByLabelText(/^password/i) as HTMLInputElement;
+    email.value = 'thambi@example.com';
+    password.value = 'autofilled-secret';
+    await user.click(screen.getByRole('button', { name: /^login$/i }));
+
+    await waitFor(
+      () =>
+        expect(auth.login).toHaveBeenCalledWith({
+          email: 'thambi@example.com',
+          password: 'autofilled-secret',
+        }),
+      FIND_TIMEOUT,
+    );
+  });
+
   it('validates fields before calling the API', async () => {
     const user = userEvent.setup();
     const auth = renderLogin();
